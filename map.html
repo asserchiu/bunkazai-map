@@ -280,6 +280,61 @@
 
     #map { flex: 1; }
 
+    /* ── Mobile: overlay drawer ───────────────────────────── */
+
+    #sidebar-toggle { display: none; }
+    #sidebar-backdrop { display: none; }
+
+    @media (max-width: 768px) {
+      #map { position: fixed; inset: 0; }
+
+      #sidebar {
+        position: fixed;
+        top: 0; left: -300px; bottom: 0;
+        z-index: 1001;
+        transition: left 0.25s ease;
+        box-shadow: 2px 0 16px rgba(0,0,0,0.35);
+      }
+      #sidebar.open { left: 0; }
+
+      #sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(0,0,0,0.4);
+      }
+      #sidebar-backdrop.visible { display: block; }
+
+      #sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 12px; left: 12px;
+        z-index: 999;
+        width: 40px; height: 40px;
+        border-radius: 6px;
+        background: #fff;
+        border: 1px solid #ccc;
+        font-size: 20px;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      }
+
+      .cat-item { padding: 10px 16px; }
+
+      #controls button,
+      #add-condition,
+      #clear-conditions { padding: 8px 0; font-size: 13px; }
+
+      .field-select { width: auto; min-width: 80px; }
+
+      #sidebar-footer { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+
+      #result-list { max-height: 200px; }
+    }
+
     /* ── Popup ────────────────────────────────────────────── */
 
     .popup-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
@@ -306,6 +361,7 @@
 </head>
 <body>
 
+<div id="sidebar-backdrop"></div>
 <aside id="sidebar">
   <div id="sidebar-header">
     <h1>Japan Nationally Designated Cultural Properties</h1>
@@ -339,6 +395,7 @@
 
 <div id="map"></div>
 
+<button id="sidebar-toggle" aria-label="Open filters">&#9776;</button>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5/dist/leaflet.markercluster.js"></script>
 <script>
@@ -452,7 +509,8 @@ function makePopupHtml(props) {
 }
 
 // ── Map ────────────────────────────────────────────────────────────────────
-const map = L.map('map').setView([36.5, 136.5], 5);
+const map = L.map('map', { zoomControl: false }).setView([36.5, 136.5], 5);
+L.control.zoom({ position: 'topright' }).addTo(map);
 
 // Populate tile selector and manage the active tile layer.
 let currentTileLayer = null;
@@ -498,7 +556,7 @@ async function init() {
       fillOpacity: 0.88,
       color: '#fff',
       weight: 1.5,
-    }).bindPopup(makePopupHtml(props), { maxWidth: 280 });
+    }).bindPopup(makePopupHtml(props), { maxWidth: Math.min(280, window.innerWidth - 32) });
 
     marker._props = props;
 
@@ -734,6 +792,25 @@ function initSearchUI() {
 }
 
 init().catch(err => console.error('Init failed:', err));
+
+// ── Mobile sidebar drawer ───────────────────────────────────────────────────
+(function () {
+  const toggle   = document.getElementById('sidebar-toggle');
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+
+  function openSidebar()  { sidebar.classList.add('open');    backdrop.classList.add('visible'); }
+  function closeSidebar() { sidebar.classList.remove('open'); backdrop.classList.remove('visible'); }
+
+  toggle.addEventListener('click', openSidebar);
+  backdrop.addEventListener('click', closeSidebar);
+
+  // Close sidebar after tapping a result so the map is visible
+  document.getElementById('result-list').addEventListener('click', () => {
+    if (window.innerWidth <= 768) closeSidebar();
+  });
+})();
 </script>
+
 </body>
 </html>

@@ -123,6 +123,23 @@ via `applyFilters()` which reconciles active categories and search conditions to
 All records with valid coordinates within Japan bounds are included. No further filtering by
 category importance or designation level.
 
+### Mobile Support
+
+**Decision:** Overlay drawer pattern — map fills full screen on mobile; a floating ≡ button
+(top-left) opens the sidebar as a fixed left-side overlay with a dismissible backdrop.
+
+**Breakpoint:** `max-width: 768px`
+
+**Details:**
+- `#sidebar-backdrop` hidden by default (`display: none`); becomes a flex child otherwise and
+  breaks the desktop layout — fixed by scoping the hide rule outside the media query
+- Zoom control moved to `topright` to avoid overlap with the ≡ button
+- Larger tap targets for category items and buttons on mobile
+- `env(safe-area-inset-bottom)` padding on footer for iPhone home indicator
+- Popup `maxWidth` capped to `Math.min(280, window.innerWidth - 32)` to avoid overflow on
+  narrow screens
+- Result list click closes the sidebar on mobile so the map is visible
+
 ### Legal / Attribution
 
 - Data source: 文化庁 国指定文化財等データベース (Agency for Cultural Affairs, Japan)
