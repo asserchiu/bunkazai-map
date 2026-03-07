@@ -1,4 +1,4 @@
-# kunishitei-bunkazai-tou-map
+# bunkazai-map
 
 Interactive map of Japan's nationally designated cultural properties (国指定文化財等),
 built from the Agency for Cultural Affairs database.
@@ -42,7 +42,7 @@ python3 -m http.server 8080
    git push
    ```
 
-`data/features.geojson` must be committed so GitHub Pages can serve it.
+`data/features.geojson` must be committed so the static host can serve it.
 
 ## Tech Stack
 
@@ -64,7 +64,7 @@ python3 -m http.server 8080
 ## Attribution
 
 Data: 文化庁 国指定文化財等データベース (Agency for Cultural Affairs, Japan)
-Map tiles: OpenFreeMap / OpenStreetMap contributors
+Map tiles: CartoDB / OpenStreetMap contributors (7 providers selectable in UI)
 
 Usage is consistent with the Government Standard Terms of Use (政府標準利用規約).
 Verify current terms before redistribution: https://kunishitei.bunka.go.jp/bsys/about

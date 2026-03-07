@@ -59,9 +59,9 @@ Applied bounds filter:
 - `管理対象ID` = per-item ID within the category. Stored as **string** to preserve leading zeros.
 - Detail URL: `https://kunishitei.bunka.go.jp/heritage/detail/{台帳ID}/{管理対象ID}`
 
-### Architecture: Fully Static Site on GitHub Pages
+### Architecture: Fully Static Site
 
-**Decision:** HTML + pre-built GeoJSON, hosted on GitHub Pages.
+**Decision:** HTML + pre-built GeoJSON, hosted on any static file host.
 
 **Rationale:**
 - Zero running cost, no server required
