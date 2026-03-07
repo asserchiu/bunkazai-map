@@ -138,6 +138,133 @@
     .cat-item.disabled .cat-name { color: #bbb; }
     .cat-item.disabled .cat-count { color: #ccc; }
 
+    /* ── Search section ──────────────────────────────────── */
+
+    #search-section {
+      border-top: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #search-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-bottom: 1px solid #eee;
+    }
+
+    #search-header > span {
+      flex: 1;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #888;
+    }
+
+    #search-header button {
+      padding: 3px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fafafa;
+      cursor: pointer;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    #search-header button:hover { background: #f0f0f0; }
+
+    #conditions { padding: 4px 0; }
+
+    .condition-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 12px;
+    }
+
+    .field-select {
+      flex-shrink: 0;
+      width: 90px;
+      padding: 4px 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fafafa;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .term-input {
+      flex: 1;
+      min-width: 0;
+      padding: 4px 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .term-input:focus { outline: none; border-color: #999; }
+
+    .remove-btn {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #aaa;
+      line-height: 1;
+      border-radius: 3px;
+    }
+
+    .remove-btn:hover { background: #eee; color: #555; }
+
+    #search-count {
+      padding: 4px 16px;
+      font-size: 11px;
+      color: #888;
+      min-height: 22px;
+    }
+
+    #result-list {
+      list-style: none;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+
+    .result-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .result-item:hover { background: #f5f5f5; }
+
+    .result-dot {
+      flex-shrink: 0;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-top: 4px;
+    }
+
+    .result-name {
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .result-meta {
+      font-size: 11px;
+      color: #999;
+    }
+
     #sidebar-footer {
       padding: 10px 16px;
       font-size: 11px;
@@ -193,6 +320,16 @@
     <button id="btn-none">Deselect All</button>
   </div>
   <ul id="category-list" role="list"></ul>
+  <div id="search-section">
+    <div id="search-header">
+      <span>Search</span>
+      <button id="clear-conditions">Clear all</button>
+      <button id="add-condition">+ Add</button>
+    </div>
+    <div id="conditions"></div>
+    <div id="search-count"></div>
+    <ul id="result-list"></ul>
+  </div>
   <div id="sidebar-footer">
     Data:
     <a href="https://kunishitei.bunka.go.jp/" target="_blank" rel="noopener">文化庁 国指定文化財等データベース</a><br>
@@ -276,6 +413,14 @@ const CATEGORIES = [
 
 const COLOR_MAP = Object.fromEntries(CATEGORIES.map(c => [c.name, c.color]));
 
+const SEARCH_FIELDS = [
+  { value: 'name',       label: 'Name' },
+  { value: 'building',   label: 'Building' },
+  { value: 'type1',      label: 'Type' },
+  { value: 'era',        label: 'Era' },
+  { value: 'prefecture', label: 'Prefecture' },
+];
+
 // ── State ──────────────────────────────────────────────────────────────────
 let activeCategories = new Set(CATEGORIES.map(c => c.name));
 const markersByCategory = {};  // category name → L.CircleMarker[]
@@ -355,6 +500,8 @@ async function init() {
       weight: 1.5,
     }).bindPopup(makePopupHtml(props), { maxWidth: 280 });
 
+    marker._props = props;
+
     if (!markersByCategory[props.category]) markersByCategory[props.category] = [];
     markersByCategory[props.category].push(marker);
     markersToAdd.push(marker);
@@ -364,6 +511,7 @@ async function init() {
 
   clusterGroup.addLayers(markersToAdd);
   buildSidebar(counts);
+  initSearchUI();
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -414,22 +562,175 @@ function buildSidebar(counts) {
 }
 
 function onToggle(name, checked) {
-  const markers = markersByCategory[name] ?? [];
-  if (checked) {
-    clusterGroup.addLayers(markers);
-    activeCategories.add(name);
-  } else {
-    clusterGroup.removeLayers(markers);
-    activeCategories.delete(name);
-  }
+  if (checked) activeCategories.add(name);
+  else activeCategories.delete(name);
+  applyFilters();
 }
 
 function setAll(checked) {
   for (const cb of document.querySelectorAll('#category-list input[type="checkbox"]:not(:disabled)')) {
     if (cb.checked === checked) continue;
     cb.checked = checked;
-    onToggle(cb.dataset.cat, checked);
+    if (checked) activeCategories.add(cb.dataset.cat);
+    else activeCategories.delete(cb.dataset.cat);
   }
+  applyFilters();
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+const debouncedApply = debounce(applyFilters, 200);
+
+function getConditions() {
+  return [...document.querySelectorAll('.condition-row')].map(row => ({
+    field: row.querySelector('.field-select').value,
+    term:  row.querySelector('.term-input').value.trim().toLowerCase(),
+  })).filter(c => c.term !== '');
+}
+
+function matchesAll(p, conditions) {
+  return conditions.every(({ field, term }) =>
+    (p[field] ?? '').toLowerCase().includes(term)
+  );
+}
+
+function applyFilters() {
+  const conditions = getConditions();
+  const hasSearch = conditions.length > 0;
+  const toAdd = [];
+  const hits = [];
+
+  for (const [cat, markers] of Object.entries(markersByCategory)) {
+    if (!activeCategories.has(cat)) continue;
+    for (const m of markers) {
+      if (!hasSearch || matchesAll(m._props, conditions)) {
+        toAdd.push(m);
+        if (hasSearch) hits.push(m);
+      }
+    }
+  }
+
+  clusterGroup.clearLayers();
+  clusterGroup.addLayers(toAdd);
+  updateResultList(hits, hasSearch);
+}
+
+function updateResultList(hits, hasSearch) {
+  const countEl = document.getElementById('search-count');
+  const list = document.getElementById('result-list');
+
+  if (!hasSearch) {
+    countEl.textContent = '';
+    list.innerHTML = '';
+    return;
+  }
+
+  countEl.textContent = hits.length === 0
+    ? 'No results'
+    : `${hits.length.toLocaleString()} result${hits.length === 1 ? '' : 's'}`;
+
+  list.innerHTML = '';
+  const shown = hits.slice(0, 100);
+  for (const m of shown) {
+    const p = m._props;
+    const color = COLOR_MAP[p.category] ?? '#999';
+
+    const li = document.createElement('li');
+    li.className = 'result-item';
+
+    const dot = document.createElement('span');
+    dot.className = 'result-dot';
+    dot.style.background = color;
+
+    const text = document.createElement('div');
+
+    const name = document.createElement('div');
+    name.className = 'result-name';
+    name.textContent = p.name || '(no name)';
+
+    const meta = document.createElement('div');
+    meta.className = 'result-meta';
+    meta.textContent = [p.prefecture, p.category].filter(Boolean).join(' · ');
+
+    text.append(name, meta);
+    li.append(dot, text);
+
+    li.addEventListener('click', () => {
+      clusterGroup.zoomToShowLayer(m, () => m.openPopup());
+    });
+
+    list.appendChild(li);
+  }
+
+  if (hits.length > 100) {
+    const more = document.createElement('li');
+    more.style.cssText = 'padding:6px 16px;font-size:11px;color:#aaa;';
+    more.textContent = `… and ${(hits.length - 100).toLocaleString()} more`;
+    list.appendChild(more);
+  }
+}
+
+function updateRemoveButtons() {
+  const btns = document.querySelectorAll('.remove-btn');
+  btns.forEach(btn => { btn.style.visibility = btns.length > 1 ? 'visible' : 'hidden'; });
+}
+
+function addConditionRow() {
+  const row = document.createElement('div');
+  row.className = 'condition-row';
+
+  const sel = document.createElement('select');
+  sel.className = 'field-select';
+  for (const f of SEARCH_FIELDS) {
+    const opt = document.createElement('option');
+    opt.value = f.value;
+    opt.textContent = f.label;
+    sel.appendChild(opt);
+  }
+
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.className = 'term-input';
+  input.placeholder = 'keyword…';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'remove-btn';
+  removeBtn.title = 'Remove';
+  removeBtn.textContent = '×';
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+    updateRemoveButtons();
+    applyFilters();
+  });
+
+  sel.addEventListener('change', debouncedApply);
+  input.addEventListener('input', debouncedApply);
+
+  row.append(sel, input, removeBtn);
+  document.getElementById('conditions').appendChild(row);
+  updateRemoveButtons();
+}
+
+function initSearchUI() {
+  addConditionRow(); // start with one empty row
+
+  document.getElementById('add-condition').addEventListener('click', () => {
+    addConditionRow();
+    // Focus the new input
+    const inputs = document.querySelectorAll('.term-input');
+    inputs[inputs.length - 1].focus();
+  });
+
+  document.getElementById('clear-conditions').addEventListener('click', () => {
+    document.getElementById('conditions').innerHTML = '';
+    addConditionRow();
+    applyFilters();
+  });
 }
 
 init().catch(err => console.error('Init failed:', err));
