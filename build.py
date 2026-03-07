@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build script: converts download.csv to data/features.geojson for the map.
+"""Build script: converts target/download.csv to data/features.geojson for the map.
 
-Run after downloading a fresh copy of download.csv:
+Run after downloading a fresh copy of target/download.csv:
     python3 build.py
 """
 
@@ -16,7 +16,7 @@ LON_BOUNDS = (120.0, 155.0)
 
 
 def main() -> None:
-    src = Path("download.csv")
+    src = Path("target/download.csv")
     out_dir = Path("data")
     out_dir.mkdir(exist_ok=True)
     out = out_dir / "features.geojson"
