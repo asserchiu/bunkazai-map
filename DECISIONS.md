@@ -123,6 +123,17 @@ via `applyFilters()` which reconciles active categories and search conditions to
 All records with valid coordinates within Japan bounds are included. No further filtering by
 category importance or designation level.
 
+### Show Labels
+
+**Decision:** Permanent Leaflet tooltips (`.name-label`) bound to each named marker, hidden by
+default via CSS (`display: none !important`). A "Show labels" checkbox toggles the `show-labels`
+class on the map container; labels are only rendered at zoom ≥ 12 to avoid clutter.
+
+Hovering a marker calls `bringToFront()` (SVG re-append) and also re-appends the tooltip DOM
+element to the end of the tooltip pane, making both the dot and label float above overlapping
+neighbours. CSS z-index and `tooltipopen`-based approaches were attempted but unreliable —
+covered labels can't be hovered directly, so the action must be triggered from the marker dot.
+
 ### Mobile Support
 
 **Decision:** Overlay drawer pattern — map fills full screen on mobile; a floating ≡ button
