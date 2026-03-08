@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaflet Marker Rendering — Canvas vs SVG vs divIcon</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; display: flex; flex-direction: column; height: 100dvh; }
+
+    #toolbar {
+      flex-shrink: 0;
+      padding: 10px 16px;
+      background: #1a1a1a;
+      color: #eee;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    #toolbar strong { font-size: 14px; }
+
+    .mode-group { display: flex; align-items: center; gap: 12px; }
+    .mode-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+    #toolbar button {
+      padding: 5px 12px;
+      background: #444;
+      color: #eee;
+      border: 1px solid #666;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    #toolbar button:hover { background: #555; }
+
+    #stats {
+      flex-shrink: 0;
+      padding: 6px 16px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      gap: 24px;
+      font-size: 12px;
+      color: #444;
+    }
+
+    #stats span { font-weight: 600; color: #111; }
+
+    #fps-badge {
+      display: inline-block;
+      min-width: 36px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: #27ae60;
+      color: #fff;
+      font-weight: 700;
+      text-align: center;
+    }
+    #fps-badge.mid { background: #e67e22; }
+    #fps-badge.low { background: #c0392b; }
+
+    #map { flex: 1; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <strong>Leaflet Marker Rendering — Canvas vs SVG vs divIcon</strong>
+  <div class="mode-group">
+    <label><input type="radio" name="mode" value="canvas"> Canvas circleMarker</label>
+    <label><input type="radio" name="mode" value="svg"> SVG circleMarker</label>
+    <label><input type="radio" name="mode" value="divicon"> divIcon (SVG)</label>
+  </div>
+  <button id="btn-reload">Reload with this mode</button>
+</div>
+
+<div id="stats">
+  <div>Mode: <span id="stat-mode">—</span></div>
+  <div>Load time: <span id="stat-load">—</span></div>
+  <div>Markers: <span id="stat-count">—</span></div>
+  <div>Drag latency: <span id="stat-drag">—</span></div>
+  <div>FPS: <span id="fps-badge">—</span></div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.js"></script>
+<script>
+// ── Mode from localStorage ──────────────────────────────────────────────────
+const MODE = localStorage.getItem('bm-mode') ?? 'canvas';
+document.querySelector(`input[value="${MODE}"]`).checked = true;
+document.getElementById('stat-mode').textContent = MODE;
+
+document.getElementById('btn-reload').addEventListener('click', () => {
+  const selected = document.querySelector('input[name="mode"]:checked').value;
+  localStorage.setItem('bm-mode', selected);
+  location.reload();
+});
+
+// ── Map ─────────────────────────────────────────────────────────────────────
+const mapOptions = { zoomControl: true };
+if (MODE === 'canvas') mapOptions.preferCanvas = true;
+
+// Initial view: Tokyo area — densest cluster (1,439 markers in 0.1°×0.1°)
+const map = L.map('map', mapOptions).setView([35.72, 139.78], 13);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  maxZoom: 19,
+}).addTo(map);
+
+// ── divIcon helpers (mode C) ─────────────────────────────────────────────────
+const SHAPE_SVG = {
+  circle:    c => `<circle cx="0" cy="0" r="5" fill="${c}" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>`,
+  diamond:   c => `<rect x="-4.5" y="-4.5" width="9" height="9" transform="rotate(45)" fill="${c}" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>`,
+  square:    c => `<rect x="-5" y="-5" width="10" height="10" fill="${c}" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>`,
+  'tri-up':  c => `<polygon points="0,-6 5.2,3 -5.2,3" fill="${c}" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>`,
+  'tri-down':c => `<polygon points="0,6 5.2,-3 -5.2,-3" fill="${c}" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>`,
+  star:      c => `<polygon points="0,-6 1.4,-2.1 5.7,-1.9 2.5,0.9 3.5,5.1 0,2.8 -3.5,5.1 -2.5,0.9 -5.7,-1.9 -1.4,-2.1" fill="${c}" fill-opacity="0.88" stroke="#fff" stroke-width="1.5"/>`,
+};
+function makeIcon(shape, color) {
+  const body = (SHAPE_SVG[shape] ?? SHAPE_SVG.circle)(color);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="-7 -7 14 14">${body}</svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
+}
+
+const SHAPE_BY_GROUP = {
+  '有形文化財（建造物）':   'circle',
+  '有形文化財（美術工芸品）':'diamond',
+  '有形民俗文化財':         'square',
+  '無形民俗文化財':         'tri-up',
+  '無形文化財・保存技術':   'tri-down',
+  '記念物・景観':           'star',
+  '世界遺産':               'star',
+};
+const CAT_GROUP = {
+  '国宝・重要文化財（建造物）':        '有形文化財（建造物）',
+  '登録有形文化財(建造物)':             '有形文化財（建造物）',
+  '重要伝統的建造物群保存地区':         '有形文化財（建造物）',
+  '国宝・重要文化財（美術工芸品）':     '有形文化財（美術工芸品）',
+  '登録有形文化財（美術工芸品）':       '有形文化財（美術工芸品）',
+  '登録美術品':                         '有形文化財（美術工芸品）',
+  '重要有形民俗文化財':                 '有形民俗文化財',
+  '登録有形民俗文化財':                 '有形民俗文化財',
+  '重要無形民俗文化財':                 '無形民俗文化財',
+  '登録無形民俗文化財':                 '無形民俗文化財',
+  '記録作成等の措置を講ずべき無形の民俗文化財': '無形民俗文化財',
+  '重要無形文化財':                     '無形文化財・保存技術',
+  '登録無形文化財':                     '無形文化財・保存技術',
+  '記録作成等の措置を講ずべき無形文化財': '無形文化財・保存技術',
+  '選定保存技術':                       '無形文化財・保存技術',
+  '史跡名勝天然記念物':                 '記念物・景観',
+  '登録記念物':                         '記念物・景観',
+  '重要文化的景観':                     '記念物・景観',
+  '世界遺産':                           '世界遺産',
+};
+
+// ── Drag latency ─────────────────────────────────────────────────────────────
+(function () {
+  const el = document.getElementById('stat-drag');
+  let pointerDown = null;
+  let measured = false;
+
+  function onDown() { pointerDown = performance.now(); measured = false; }
+  map.getContainer().addEventListener('mousedown', onDown);
+  map.getContainer().addEventListener('touchstart', onDown, { passive: true });
+
+  map.on('move', () => {
+    if (pointerDown !== null && !measured) {
+      measured = true;
+      const t = pointerDown;
+      pointerDown = null;
+      // Double rAF: wait until the browser has actually painted the moved frame.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        el.textContent = `${Math.round(performance.now() - t)} ms`;
+      }));
+    }
+  });
+})();
+
+// ── FPS counter ─────────────────────────────────────────────────────────────
+(function () {
+  const badge = document.getElementById('fps-badge');
+  const history = [];
+  let last = performance.now();
+
+  function tick(now) {
+    const delta = now - last;
+    last = now;
+    if (delta > 0 && delta < 500) {
+      history.push(1000 / delta);
+      if (history.length > 10) history.shift();
+      const fps = Math.round(history.reduce((a, b) => a + b) / history.length);
+      badge.textContent = fps;
+      badge.className = fps >= 50 ? '' : fps >= 30 ? 'mid' : 'low';
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+
+// ── Load data ───────────────────────────────────────────────────────────────
+// features.geojson doesn't store color; reconstruct from category name
+const COLOR_MAP = {
+  '国宝・重要文化財（建造物）': '#c0392b',
+  '登録有形文化財(建造物)':     '#e67e22',
+  '重要伝統的建造物群保存地区': '#922b21',
+  '国宝・重要文化財（美術工芸品）': '#6c3483',
+  '登録有形文化財（美術工芸品）':   '#a569bd',
+  '登録美術品':                     '#d7bde2',
+  '重要有形民俗文化財':             '#1a5276',
+  '登録有形民俗文化財':             '#2e86c1',
+  '重要無形民俗文化財':             '#7fb3d3',
+  '登録無形民俗文化財':             '#aed6f1',
+  '記録作成等の措置を講ずべき無形の民俗文化財': '#85c1e9',
+  '重要無形文化財':                 '#717d7e',
+  '登録無形文化財':                 '#99a3a4',
+  '記録作成等の措置を講ずべき無形文化財': '#b2babb',
+  '選定保存技術':                   '#808b96',
+  '史跡名勝天然記念物':             '#1e8449',
+  '登録記念物':                     '#52be80',
+  '重要文化的景観':                 '#16a085',
+  '世界遺産':                       '#d4ac0d',
+};
+
+async function init() {
+  const resp = await fetch('../data/features.geojson');
+  const geojson = await resp.json();
+
+  // Inject color into properties for reuse
+  for (const f of geojson.features) {
+    f.properties.color = COLOR_MAP[f.properties.category] ?? '#999';
+  }
+
+  const t0 = performance.now();
+  const layer = L.layerGroup().addTo(map);
+
+  for (const feature of geojson.features) {
+    const [lon, lat] = feature.geometry.coordinates;
+    const { category, color } = feature.properties;
+
+    let marker;
+    if (MODE === 'divicon') {
+      const group = CAT_GROUP[category] ?? '有形文化財（建造物）';
+      const shape = SHAPE_BY_GROUP[group] ?? 'circle';
+      marker = L.marker([lat, lon], { icon: makeIcon(shape, color) });
+    } else {
+      marker = L.circleMarker([lat, lon], {
+        radius: 6, fillColor: color, fillOpacity: 0.88, color: '#fff', weight: 1.5,
+      });
+    }
+    layer.addLayer(marker);
+  }
+
+  const loadMs = Math.round(performance.now() - t0);
+  document.getElementById('stat-load').textContent = `${loadMs.toLocaleString()} ms`;
+  document.getElementById('stat-count').textContent = geojson.features.length.toLocaleString();
+}
+
+init().catch(console.error);
+</script>
+</body>
+</html>
