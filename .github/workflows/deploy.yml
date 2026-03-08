@@ -26,7 +26,8 @@ jobs:
       - name: Prepare site files
         run: |
           mkdir _site
-          cp index.html map.html _site/
+          sed "s|__SITE_URL__|${{ vars.SITE_URL }}|g" index.html > _site/index.html
+          sed "s|__SITE_URL__|${{ vars.SITE_URL }}|g" map.html > _site/map.html
           mkdir _site/data
           cp data/features.geojson _site/data/
 
