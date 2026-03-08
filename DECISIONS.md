@@ -104,6 +104,10 @@ All 19 categories are listed in the sidebar filter. Categories with 0 mappable r
 greyed out and disabled. Counts show the number of features present in the GeoJSON (i.e. records
 with valid coordinates within Japan bounds).
 
+Markers use `L.circleMarker` (canvas renderer via `preferCanvas: true`) — all circles, no shape
+differentiation on the map. Shape-per-group was considered but `L.marker` + `L.divIcon` was too
+slow at 28k markers (see `benchmarks/leaflet-marker-rendering.md`).
+
 ### GeoJSON Field Selection
 
 `address`（所在地）was removed from the exported GeoJSON to reduce file size (~10.3 MB →

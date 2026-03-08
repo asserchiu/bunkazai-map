@@ -558,7 +558,7 @@ function makePopupHtml(props) {
 }
 
 // ── Map ────────────────────────────────────────────────────────────────────
-const map = L.map('map', { zoomControl: false }).setView([36.5, 136.5], 5);
+const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([36.5, 136.5], 5);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
 // Populate tile selector and manage the active tile layer.
