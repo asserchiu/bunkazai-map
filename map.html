@@ -93,6 +93,20 @@
 
     #controls button:hover { background: #f0f0f0; }
 
+    #label-control {
+      padding: 5px 16px 6px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    #label-control label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
     #category-list {
       flex: 1;
       overflow-y: auto;
@@ -339,6 +353,22 @@
       #result-list { max-height: 200px; }
     }
 
+    /* ── Name labels ──────────────────────────────────────── */
+
+    .name-label {
+      display: none !important;
+      background: rgba(255,255,255,0.85);
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 3px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      font-size: 11px;
+      padding: 2px 5px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #map.show-labels .name-label { display: block !important; }
+
     /* ── Popup ────────────────────────────────────────────── */
 
     .popup-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
@@ -378,6 +408,12 @@
   <div id="controls">
     <button id="btn-all">Select All</button>
     <button id="btn-none">Deselect All</button>
+  </div>
+  <div id="label-control">
+    <label>
+      <input type="checkbox" id="cb-show-labels">
+      Show labels
+    </label>
   </div>
   <ul id="category-list" role="list"></ul>
   <div id="search-section">
@@ -563,6 +599,14 @@ async function init() {
     }).bindPopup(makePopupHtml(props), { maxWidth: Math.min(280, window.innerWidth - 32) });
 
     marker._props = props;
+    marker.on('mouseover', function () {
+      this.bringToFront();
+      const el = this.getTooltip()?.getElement();
+      if (el) el.parentNode?.appendChild(el);
+    });
+    if (props.name) {
+      marker.bindTooltip(props.name, { permanent: true, direction: 'right', className: 'name-label' });
+    }
 
     if (!markersByCategory[props.category]) markersByCategory[props.category] = [];
     markersByCategory[props.category].push(marker);
@@ -796,6 +840,21 @@ function initSearchUI() {
 }
 
 init().catch(err => console.error('Init failed:', err));
+
+// ── Show names toggle ───────────────────────────────────────────────────────
+(function () {
+  const cb = document.getElementById('cb-show-labels');
+  const MIN_ZOOM = 12;
+
+  function updateLabelVisibility() {
+    const on = cb.checked && map.getZoom() >= MIN_ZOOM;
+    map.getContainer().classList.toggle('show-labels', on);
+  }
+
+  cb.addEventListener('change', updateLabelVisibility);
+  map.on('zoomend', updateLabelVisibility);
+
+})();
 
 // ── Mobile sidebar drawer ───────────────────────────────────────────────────
 (function () {
