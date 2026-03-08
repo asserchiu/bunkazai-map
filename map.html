@@ -141,6 +141,15 @@
       background: var(--cat-color);
     }
 
+    .group-header {
+      padding: 8px 16px 2px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #aaa;
+    }
+
     .cat-name { flex: 1; line-height: 1.4; }
 
     .cat-count {
@@ -487,25 +496,25 @@ const TILE_PROVIDERS = [
 
 // ── Category definitions ───────────────────────────────────────────────────
 const CATEGORIES = [
-  { name: '国宝・重要文化財（建造物）',                        color: '#c0392b' },
-  { name: '登録有形文化財(建造物)',                             color: '#e67e22' },
-  { name: '重要伝統的建造物群保存地区',                         color: '#922b21' },
-  { name: '国宝・重要文化財（美術工芸品）',                     color: '#6c3483' },
-  { name: '登録有形文化財（美術工芸品）',                       color: '#a569bd' },
-  { name: '登録美術品',                                         color: '#d7bde2' },
-  { name: '重要有形民俗文化財',                                 color: '#1a5276' },
-  { name: '登録有形民俗文化財',                                 color: '#2e86c1' },
-  { name: '重要無形民俗文化財',                                 color: '#7fb3d3' },
-  { name: '登録無形民俗文化財',                                 color: '#aed6f1' },
-  { name: '記録作成等の措置を講ずべき無形の民俗文化財',         color: '#85c1e9' },
-  { name: '重要無形文化財',                                     color: '#717d7e' },
-  { name: '登録無形文化財',                                     color: '#99a3a4' },
-  { name: '記録作成等の措置を講ずべき無形文化財',               color: '#b2babb' },
-  { name: '選定保存技術',                                       color: '#808b96' },
-  { name: '史跡名勝天然記念物',                                 color: '#1e8449' },
-  { name: '登録記念物',                                         color: '#52be80' },
-  { name: '重要文化的景観',                                     color: '#16a085' },
-  { name: '世界遺産',                                           color: '#d4ac0d' },
+  { name: '国宝・重要文化財（建造物）',                        color: '#c0392b', group: '有形文化財（建造物）' },
+  { name: '登録有形文化財(建造物)',                             color: '#e67e22', group: '有形文化財（建造物）' },
+  { name: '重要伝統的建造物群保存地区',                         color: '#922b21', group: '有形文化財（建造物）' },
+  { name: '国宝・重要文化財（美術工芸品）',                     color: '#6c3483', group: '有形文化財（美術工芸品）' },
+  { name: '登録有形文化財（美術工芸品）',                       color: '#a569bd', group: '有形文化財（美術工芸品）' },
+  { name: '登録美術品',                                         color: '#d7bde2', group: '有形文化財（美術工芸品）' },
+  { name: '重要有形民俗文化財',                                 color: '#1a5276', group: '有形民俗文化財' },
+  { name: '登録有形民俗文化財',                                 color: '#2e86c1', group: '有形民俗文化財' },
+  { name: '重要無形民俗文化財',                                 color: '#7fb3d3', group: '無形民俗文化財' },
+  { name: '登録無形民俗文化財',                                 color: '#aed6f1', group: '無形民俗文化財' },
+  { name: '記録作成等の措置を講ずべき無形の民俗文化財',         color: '#85c1e9', group: '無形民俗文化財' },
+  { name: '重要無形文化財',                                     color: '#717d7e', group: '無形文化財・保存技術' },
+  { name: '登録無形文化財',                                     color: '#99a3a4', group: '無形文化財・保存技術' },
+  { name: '記録作成等の措置を講ずべき無形文化財',               color: '#b2babb', group: '無形文化財・保存技術' },
+  { name: '選定保存技術',                                       color: '#808b96', group: '無形文化財・保存技術' },
+  { name: '史跡名勝天然記念物',                                 color: '#1e8449', group: '記念物・景観' },
+  { name: '登録記念物',                                         color: '#52be80', group: '記念物・景観' },
+  { name: '重要文化的景観',                                     color: '#16a085', group: '記念物・景観' },
+  { name: '世界遺産',                                           color: '#d4ac0d', group: '世界遺産' },
 ];
 
 const COLOR_MAP = Object.fromEntries(CATEGORIES.map(c => [c.name, c.color]));
@@ -624,7 +633,16 @@ async function init() {
 function buildSidebar(counts) {
   const list = document.getElementById('category-list');
 
+  // Note: assumes same-group entries are consecutive in CATEGORIES.
+  let currentGroup = null;
   for (const cat of CATEGORIES) {
+    if (cat.group !== currentGroup) {
+      currentGroup = cat.group;
+      const header = document.createElement('li');
+      header.className = 'group-header';
+      header.textContent = cat.group;
+      list.appendChild(header);
+    }
     const count = counts[cat.name] || 0;
     const disabled = count === 0;
 
